@@ -10,7 +10,8 @@ connectDB();
 
 const app = express();
 app.use(cors({
-  origin: ['https://admin.amppaclinic.com', 'https://amppa-admin-frontend-qhka.vercel.app', 'http://localhost:3000'],
+  origin: true,
+  credentials: true
 }));
 
 app.use(express.json());
