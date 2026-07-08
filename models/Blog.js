@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 
 const blogSchema = new mongoose.Schema({
   title: String,
+  slug: { type: String, unique: true, sparse: true },
   short_description: String,
   description: String,
   banner_image: String,
