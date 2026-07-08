@@ -1,17 +1,42 @@
 const Blog = require('../models/Blog');
 
+function generateSlug(title) {
+  return title
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+}
+
+async function uniqueSlug(title, excludeId) {
+  let base = generateSlug(title);
+  let slug = base;
+  let counter = 1;
+  while (true) {
+    const query = { slug };
+    if (excludeId) query._id = { $ne: excludeId };
+    const existing = await Blog.findOne(query);
+    if (!existing) return slug;
+    counter++;
+    slug = `${base}-${counter}`;
+  }
+}
+
 exports.createBlog = async (req, res) => {
  try {
     const { title, short_description, description, meta_title, meta_description,hashtags } = req.body;
 const banner_image = req.file ? `/blogs/upload/${req.file.filename}` : null;
+    const slug = await uniqueSlug(title);
     const newBlog = new Blog({
       title,
+      slug,
       short_description,
       description,
       banner_image,
       meta_title,
       meta_description,
-      author: req.user._id , // assuming you attach logged-in user info to req.user after auth
+      author: req.user._id,
       hashtags: hashtags ? (Array.isArray(hashtags) ? hashtags : hashtags.split(",")) : []
     });
 
@@ -32,6 +57,7 @@ exports.getBlogs = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
 exports.getBlogById = async (req, res) => {
   try {
     const blog = await Blog.findById(req.params.id);
@@ -43,18 +69,31 @@ exports.getBlogById = async (req, res) => {
   }
 };
 
+exports.getBlogBySlug = async (req, res) => {
+  try {
+    const blog = await Blog.findOne({ slug: req.params.slug });
+    if (!blog) return res.status(404).json({ message: 'Blog not found' });
+    res.json(blog);
+  } catch (error) {
+    console.error('Error fetching blog by slug:', error.message);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 exports.updateBlog = async (req, res) => {
   try {
     const blog = await Blog.findById(req.params.id);
     if (!blog) return res.status(404).json({ message: 'Blog not found' });
 
     const { title, short_description, description, meta_title, meta_description ,hashtags} = req.body;
-  // If a new image is uploaded, replace the banner_image field
   if (hashtags) {
   blog.hashtags = Array.isArray(hashtags) ? hashtags : hashtags.split(",");
 }
     if (req.file) {
       blog.banner_image = `/blogs/upload/${req.file.filename}`;
+    }
+    if (title && title !== blog.title) {
+      blog.slug = await uniqueSlug(title, blog._id);
     }
     blog.title = title || blog.title;
     blog.short_description = short_description || blog.short_description;
